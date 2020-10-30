@@ -5,6 +5,7 @@ from torch.nn import functional as F
 from queue import Queue, Empty
 import time
 import threading
+import torch
 
 # Server & Handling Setting
 app = Flask(__name__)
@@ -15,6 +16,7 @@ CHECK_INTERVAL = 0.1
 
 tokenizer = AutoTokenizer.from_pretrained("mrm8488/gpt2-finetuned-reddit-tifu")
 model = AutoModelWithLMHead.from_pretrained("mrm8488/gpt2-finetuned-reddit-tifu", return_dict=True)
+model.to('cuda')
 
 
 # Queue 핸들링
@@ -40,7 +42,8 @@ threading.Thread(target=handle_requests_by_batch).start()
 def run_word(sequence, num_samples):
     print("word!")
     input_ids = tokenizer.encode(sequence, return_tensors="pt")
-    next_token_logits = model(input_ids).logits[:, -1, :]
+    tokens_tensor = input_ids.to('cuda')
+    next_token_logits = model(tokens_tensor).logits[:, -1, :]
     filtered_next_token_logits = top_k_top_p_filtering(next_token_logits, top_k=50, top_p=1.0)
     probs = F.softmax(filtered_next_token_logits, dim=-1)
     next_token = torch.multinomial(probs, num_samples=num_samples)
@@ -54,10 +57,11 @@ def run_word(sequence, num_samples):
 def run_generate(text, num_samples, length):
     print("generate!")
     input_ids = tokenizer.encode(text, return_tensors="pt")
+    tokens_tensor = input_ids.to('cuda')
     min_length = len(input_ids.tolist()[0])
     length += min_length
 
-    outputs = model.generate(input_ids, 
+    outputs = model.generate(tokens_tensor, 
         max_length=length, 
         min_length=length, 
         do_sample=True, 
