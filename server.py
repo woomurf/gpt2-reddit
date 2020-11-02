@@ -7,6 +7,8 @@ import time
 import threading
 import torch
 
+from util import get_bad_word_list
+
 # Server & Handling Setting
 app = Flask(__name__)
 
@@ -31,7 +33,7 @@ def handle_requests_by_batch():
                 continue
 
             for requests in requests_batch:
-                if len(requests) == 2:
+                if len(requests['input']) == 2:
                     requests['output'] = run_word(requests['input'][0], requests['input'][1])
                 else:
                     requests['output'] = run_generate(requests['input'][0], requests['input'][1], requests['input'][2])
@@ -61,13 +63,16 @@ def run_generate(text, num_samples, length):
     tokens_tensor = input_ids.to(device)
     min_length = len(input_ids.tolist()[0])
     length += min_length
+    
+    bad_word_tokens = get_bad_word_list()
 
     outputs = model.generate(tokens_tensor, 
         max_length=length, 
         min_length=length, 
         do_sample=True, 
         top_k=num_samples,
-        num_return_sequences=num_samples)
+        num_return_sequences=num_samples,
+        bad_word_ids=bad_word_tokens)
 
     result = {}
     for idx, output in enumerate(outputs):
@@ -76,7 +81,10 @@ def run_generate(text, num_samples, length):
     return result
 
 @app.route("/gpt2-reddit/<mode>", methods=['POST'])
-def run_gpt2_reddit(type):
+def run_gpt2_reddit(mode):
+    if mode not in ["short", "long"]:
+        return jsonify({'error': 'This is wrong address'}), 400
+
     # 큐에 쌓여있을 경우,
     if requests_queue.qsize() > BATCH_SIZE:
         return jsonify({'error': 'TooManyReqeusts'}), 429
