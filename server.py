@@ -1,6 +1,6 @@
 from transformers import AutoModelWithLMHead, AutoTokenizer, top_k_top_p_filtering
 import torch
-from flask import Flask, request, Response
+from flask import Flask, request, Response, jsonify
 from torch.nn import functional as F
 from queue import Queue, Empty
 import time
