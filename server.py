@@ -16,7 +16,8 @@ CHECK_INTERVAL = 0.1
 
 tokenizer = AutoTokenizer.from_pretrained("mrm8488/gpt2-finetuned-reddit-tifu")
 model = AutoModelWithLMHead.from_pretrained("mrm8488/gpt2-finetuned-reddit-tifu", return_dict=True)
-model.to('cuda')
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+model.to(device)
 
 
 # Queue 핸들링
@@ -30,10 +31,10 @@ def handle_requests_by_batch():
                 continue
 
             for requests in requests_batch:
-                if requests['input'][0] == "word":
-                    requests['output'] = run_word(requests['input'][1], requests['input'][2])
+                if len(requests) == 2:
+                    requests['output'] = run_word(requests['input'][0], requests['input'][1])
                 else:
-                    requests['output'] = run_generate(requests['input'][1], requests['input'][2], requests['input'][3])
+                    requests['output'] = run_generate(requests['input'][0], requests['input'][1], requests['input'][2])
 
 
 # 쓰레드
@@ -42,7 +43,7 @@ threading.Thread(target=handle_requests_by_batch).start()
 def run_word(sequence, num_samples):
     print("word!")
     input_ids = tokenizer.encode(sequence, return_tensors="pt")
-    tokens_tensor = input_ids.to('cuda')
+    tokens_tensor = input_ids.to(device)
     next_token_logits = model(tokens_tensor).logits[:, -1, :]
     filtered_next_token_logits = top_k_top_p_filtering(next_token_logits, top_k=50, top_p=1.0)
     probs = F.softmax(filtered_next_token_logits, dim=-1)
@@ -57,7 +58,7 @@ def run_word(sequence, num_samples):
 def run_generate(text, num_samples, length):
     print("generate!")
     input_ids = tokenizer.encode(text, return_tensors="pt")
-    tokens_tensor = input_ids.to('cuda')
+    tokens_tensor = input_ids.to(device)
     min_length = len(input_ids.tolist()[0])
     length += min_length
 
@@ -74,17 +75,19 @@ def run_generate(text, num_samples, length):
     print(result)
     return result
 
-@app.route("/gpt2-word", methods=['POST'])
-def word():
+@app.route("/gpt2-reddit/<mode>", methods=['POST'])
+def run_gpt2_reddit(type):
     # 큐에 쌓여있을 경우,
     if requests_queue.qsize() > BATCH_SIZE:
         return jsonify({'error': 'TooManyReqeusts'}), 429
 
     # 웹페이지로부터 이미지와 스타일 정보를 얻어옴.
     try:
-        text = request.form['text']
-        num_samples = int(request.form['num_samples'])
-        mode = "word"
+        args = []
+        args.append(request.form['text'])
+        args.append(int(request.form['num_samples']))
+        if mode == "long":
+            length = args.append(int(request.form['length']))
 
     except Exception:
         print("Empty Text")
@@ -92,7 +95,7 @@ def word():
 
     # Queue - put data
     req = {
-        'input': [mode, text, num_samples]
+        'input': args
     }
     requests_queue.put(req)
 
@@ -103,39 +106,6 @@ def word():
     result = req['output']
 
     return result
-
-@app.route("/gpt2-generate", methods=["POST"])
-def generate():
-    # 큐에 쌓여있을 경우,
-    if requests_queue.qsize() > BATCH_SIZE:
-        return jsonify({'error': 'TooManyReqeusts'}), 429
-
-    # 웹페이지로부터 이미지와 스타일 정보를 얻어옴.
-    try:
-        text = request.form['text']
-        num_samples = int(request.form['num_samples'])
-        length = int(request.form['length'])
-        mode = "generate"
-
-    except Exception:
-        print("Empty Text")
-        return Response("fail", status=400)
-
-    # Queue - put data
-    req = {
-        'input': [mode, text, num_samples, length]
-    }
-    requests_queue.put(req)
-
-    # Queue - wait & check
-    while 'output' not in req:
-        time.sleep(CHECK_INTERVAL)
-
-    result = req['output']
-
-    return result
-
-
 
 # Health Check
 @app.route("/healthz", methods=["GET"])
