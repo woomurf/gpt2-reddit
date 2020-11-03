@@ -21,6 +21,7 @@ model = AutoModelWithLMHead.from_pretrained("mrm8488/gpt2-finetuned-reddit-tifu"
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 model.to(device)
 
+bad_word_tokens = get_bad_word_list()
 
 # Queue 핸들링
 def handle_requests_by_batch():
@@ -63,8 +64,6 @@ def run_generate(text, num_samples, length):
     tokens_tensor = input_ids.to(device)
     min_length = len(input_ids.tolist()[0])
     length += min_length
-    
-    bad_word_tokens = get_bad_word_list()
 
     outputs = model.generate(tokens_tensor,
         pad_token_id=50256, 
@@ -78,7 +77,7 @@ def run_generate(text, num_samples, length):
     result = {}
     for idx, output in enumerate(outputs):
         result[idx] = tokenizer.decode(output.tolist()[min_length:], skip_special_tokens=True)
-        
+
     print(result)
     return result
 
