@@ -10,7 +10,7 @@ def get_bad_word_list():
 
     bad_word_tokens = []
     for badword in bad_word_list:
-        token = tokenizer.encode(badword)
+        token = tokenizer.encode(badword, add_prefix_space=True)
         bad_word_tokens.append(token)
     
     return bad_word_tokens
