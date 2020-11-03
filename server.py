@@ -70,9 +70,9 @@ def run_generate(text, num_samples, length):
         max_length=length, 
         min_length=length, 
         do_sample=True, 
-        top_k=num_samples,
+        top_k=50,
         num_return_sequences=num_samples,
-        bad_word_ids=bad_word_tokens)
+        bad_words_ids=bad_word_tokens)
 
     result = {}
     for idx, output in enumerate(outputs):
