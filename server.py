@@ -66,7 +66,8 @@ def run_generate(text, num_samples, length):
     
     bad_word_tokens = get_bad_word_list()
 
-    outputs = model.generate(tokens_tensor, 
+    outputs = model.generate(tokens_tensor,
+        pad_token_id=50256, 
         max_length=length, 
         min_length=length, 
         do_sample=True, 
@@ -77,6 +78,7 @@ def run_generate(text, num_samples, length):
     result = {}
     for idx, output in enumerate(outputs):
         result[idx] = tokenizer.decode(output.tolist()[min_length:], skip_special_tokens=True)
+        
     print(result)
     return result
 
