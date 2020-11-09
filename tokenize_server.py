@@ -8,6 +8,7 @@ import time
 import threading
 import torch
 
+import json
 from util import get_bad_word_list
 import numpy as np
 import requests
@@ -90,32 +91,32 @@ def run_word(context, length, model):
 
     return result
 
-def run_generation(model, text, length):
-    print("In run generation")
+def run_generation(model, text, mode):
     tokenizer = tokenizers[model]
     input_ids = tokenizer.encode(text)
-    print("done tokenize")
 
-    url = models[model] + model + "/" + length
-    print(url)
+    min_length = len(input_ids)
+    length = min_length + 20
 
-    data = {
+    url = models[model] + model + "/" + mode
+
+    data = json.dumps({
         "input_ids": input_ids,
         "num_samples": 5,
-        "length": 20
-    }
+        "length": length
+    })
 
-    response = requests.post(url, data)
+    header = {"content-type":"application/json"}
+    response = requests.post(url, data=data, headers=header)
 
     if response.status_code != 200:
         return {"error":"error"}
     
-    print(response.json())
     outputs = response.json()['output']
 
     result = {}
     for idx, output in enumerate(outputs):
-        result[idx] = tokenizer.decode(output.tolist()[min_length:], skip_special_tokens=True)
+        result[idx] = tokenizer.decode(output[min_length:], skip_special_tokens=True)
 
     return result
 
@@ -137,7 +138,6 @@ def gpt2():
     except Exception:
         return jsonify({'error':'Invalid Inputs'}), 400
 
-    print(args)
     req = {
         'input': args
     }
@@ -147,6 +147,8 @@ def gpt2():
         time.sleep(CHECK_INTERVAL)
     
     result = req['output']
+
+    return result
 
 @app.route("/healthz", methods=["GET"])
 def healthz():

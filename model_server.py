@@ -6,6 +6,7 @@ from queue import Queue, Empty
 import time
 import threading
 import torch
+import json
 
 from util import get_bad_word_list
 
@@ -31,10 +32,7 @@ def handle_requests_by_batch():
                 continue
 
             for requests in requests_batch:
-                if len(requests['input']) == 1:
-                    requests['output'] = run_word(requests['input'][0])
-                else:
-                    requests['output'] = run_generate(requests['input'][0], requests['input'][1], requests['input'][2])
+                requests['output'] = run_generate(requests['input'][0], requests['input'][1], requests['input'][2])
 
 
 threading.Thread(target=handle_requests_by_batch).start()
@@ -49,7 +47,12 @@ def run_word(input_ids):
     return {'output': output} 
 
 def run_generate(input_ids, num_samples, length):
-    token_tensor = torch.LongTensor([input_ids]).to(deivce)
+    inputs = []
+
+    for input_id in input_ids:
+        inputs.append(int(input_id))
+
+    token_tensor = torch.LongTensor([inputs]).to(device)
 
     outputs = model.generate(
         token_tensor,
@@ -61,7 +64,7 @@ def run_generate(input_ids, num_samples, length):
         num_return_sequences=num_samples,
         bad_words_ids=bad_word_tokens
     )
-    print(outputs.shape)
+
     outputs = outputs.tolist()
 
     return {"output": outputs}
@@ -75,13 +78,14 @@ def gpt2(type):
     if requests_queue.qsize() > BATCH_SIZE:
         return jsonify({'error': 'TooManyReqeusts'}), 429
 
+    data = request.json
+
     try:
         args= [] 
-        args.append(request.form['input_ids'])
-        
+        args.append(data['input_ids'])
         if type == "long":
-            args.append(request.form['num_samples'])
-            args.append(request.form['length'])
+            args.append(data['num_samples'])
+            args.append(data['length'])
     except Exception:
         return jsonify({'error':'Invalid Inputs'}), 400
     
