@@ -44,42 +44,48 @@ def handle_requests_by_batch():
 threading.Thread(target=handle_requests_by_batch).start()
 
 def run_word(sequence, num_samples):
-    print("word!")
-    input_ids = tokenizer.encode(sequence, return_tensors="pt")
-    tokens_tensor = input_ids.to(device)
-    next_token_logits = model(tokens_tensor).logits[:, -1, :]
-    filtered_next_token_logits = top_k_top_p_filtering(next_token_logits, top_k=50, top_p=1.0)
-    probs = F.softmax(filtered_next_token_logits, dim=-1)
-    next_token = torch.multinomial(probs, num_samples=num_samples)
+    try:
+        input_ids = tokenizer.encode(sequence, return_tensors="pt")
+        tokens_tensor = input_ids.to(device)
+        next_token_logits = model(tokens_tensor).logits[:, -1, :]
+        filtered_next_token_logits = top_k_top_p_filtering(next_token_logits, top_k=50, top_p=1.0)
+        probs = F.softmax(filtered_next_token_logits, dim=-1)
+        next_token = torch.multinomial(probs, num_samples=num_samples)
 
-    result = dict()
-    for idx, token in enumerate(next_token.tolist()[0]):
-        result[idx] = tokenizer.decode(token)
-    print(result)
-    return result
+        result = dict()
+        for idx, token in enumerate(next_token.tolist()[0]):
+            result[idx] = tokenizer.decode(token)
+
+        return result
+    except Exception as e:
+        print(e)
+        return 500
+
 
 def run_generate(text, num_samples, length):
-    print("generate!")
-    input_ids = tokenizer.encode(text, return_tensors="pt")
-    tokens_tensor = input_ids.to(device)
-    min_length = len(input_ids.tolist()[0])
-    length += min_length
+    try:
+        input_ids = tokenizer.encode(text, return_tensors="pt")
+        tokens_tensor = input_ids.to(device)
+        min_length = len(input_ids.tolist()[0])
+        length += min_length
 
-    outputs = model.generate(tokens_tensor,
-        pad_token_id=50256, 
-        max_length=length, 
-        min_length=length, 
-        do_sample=True, 
-        top_k=50,
-        num_return_sequences=num_samples,
-        bad_words_ids=bad_word_tokens)
+        outputs = model.generate(tokens_tensor,
+            pad_token_id=50256, 
+            max_length=length, 
+            min_length=length, 
+            do_sample=True, 
+            top_k=50,
+            num_return_sequences=num_samples,
+            bad_words_ids=bad_word_tokens)
 
-    result = {}
-    for idx, output in enumerate(outputs):
-        result[idx] = tokenizer.decode(output.tolist()[min_length:], skip_special_tokens=True)
+        result = {}
+        for idx, output in enumerate(outputs):
+            result[idx] = tokenizer.decode(output.tolist()[min_length:], skip_special_tokens=True)
 
-    print(result)
-    return result
+        return result
+    except Exception as e:
+        print(e)
+        return 500
 
 @app.route("/gpt2-reddit/<mode>", methods=['POST'])
 def run_gpt2_reddit(mode):
